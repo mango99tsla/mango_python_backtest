@@ -1,0 +1,70 @@
+"""
+# RSI 突破策略
+買進: 當短周期RSI>常週期RSI，則進場 
+賣出: 當短週期RSI小於長周期RSI減去0.1%，則出場
+"""
+
+from tool_v2 import getDataYF, ChartTrade, Performance
+import pandas as pd
+import mplfinance as mpf
+from talib.abstract import EMA, SMA, RSI
+import warnings
+warnings.filterwarnings('ignore')
+
+prod = 'voo'
+data = getDataYF(prod, '2018-01-01','2023-09-07')
+
+# 計算RSI 指標
+data['rsi1'] = RSI(data, timeperiod=10) # 過去N天的平均漲幅/過去N天的平均跌幅
+data['rsi2'] = RSI(data, timeperiod=20) 
+
+# 初始部位
+position = 0
+
+trade = {int(0):[], int(1):[],int(2):[], int(3):[], int(4):[],int(5):[],int(6):[]}
+
+
+
+# 開始回測
+for i in range(data.shape[0]-1):
+    c_time = data.index[i]
+    c_high = data.loc[c_time, 'high']
+    c_close = data.loc[c_time,'close']
+    c_rsi1 = data.loc[c_time,'rsi1']
+    c_rsi2 = data.loc[c_time,'rsi2']
+    
+    n_time = data.index[i+1]
+    n_open = data.loc[n_time,'open']
+    
+    # 進場
+    if position ==0 :
+        if c_rsi1 > c_rsi2:
+            position = 1
+            orider_i = i
+            order_time = n_time
+            order_price = n_open
+            order_unit = 1
+    # 出場
+    elif position ==1:
+        if c_rsi1 < c_rsi2 * 0.999:
+            position = 0
+            cover_time = n_time
+            cover_price = n_open
+            # 交易紀錄
+            trade[0].append(prod)
+            trade[1].append('Buy')
+            trade[2].append(order_time)
+            trade[3].append(order_price)
+            trade[4].append(cover_time)
+            trade[5].append(cover_price)
+            trade[6].append(order_unit)
+
+trade = pd.DataFrame(trade)
+
+# 繪製副圖
+addp=[]
+addp.append(mpf.make_addplot(data['rsi1'],panel=2,secondary_y=False))
+addp.append(mpf.make_addplot(data['rsi2'],panel=2,secondary_y=False))
+
+# 績效
+Performance(trade,'ETF')
